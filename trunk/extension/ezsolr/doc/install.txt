@@ -1,4 +1,28 @@
-Enable the extension
+Configure your Solr search server. A basic schema.xml field configuration:
+
+<fields>
+    <field name="m_id" type="integer" indexed="true" stored="true"/>
+    <field name="m_name" type="text" indexed="true" stored="true"/>
+    <field name="m_class_name" type="string" indexed="true" stored="true"/>
+    <field name="m_section_id" type="integer" indexed="true" stored="true"/>
+    <field name="m_owner_id" type="integer" indexed="true" stored="true"/>
+    <field name="m_contentclass_id" type="integer" indexed="true" stored="true"/>
+    <field name="m_current_version" type="integer" indexed="true" stored="true"/>
+    <field name="m_remote_id" type="string" indexed="true" stored="true"/>
+    <field name="m_class_identifier" type="string" indexed="true" stored="true"/>
+    <field name="m_main_node_id" type="integer" indexed="true" stored="true"/>
+    <field name="m_main_parent_node_id" type="integer" indexed="true" stored="true"/>
+    <field name="m_path" type="integer" indexed="true" stored="true" multiValued="true"/>
+</fields>
+
+ <!-- field to use to determine and enforce document uniqueness. -->
+ <uniqueKey>m_id</uniqueKey>
+
+ <!-- field for the QueryParser to use when an explicit fieldname is absent -->
+ <defaultSearchField>m_name</defaultSearchField>
+
+
+Enable the extension.
 
 
 In settings/override/solr.ini.append.php, configure your Solr server address:
