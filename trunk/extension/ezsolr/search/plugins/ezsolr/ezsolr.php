@@ -118,6 +118,119 @@ class eZSolr
         //$this->post( $updateURI, '<optimize/>' );
     }
 
+    /*!
+     \return a Lucene query string which can be used as filter query for Solr
+     \todo Handle "group" value of Owner limitation
+     \todo Investigate if we can group multiple clauses to a single field: http://lucene.apache.org/java/docs/queryparsersyntax.html#Field%20Grouping
+    */
+    function policyLimitationFilterQuery()
+    {
+        include_once( 'kernel/classes/datatypes/ezuser/ezuser.php' );
+        $currentUser =& eZUser::currentUser();
+        $accessResult = $currentUser->hasAccessTo( 'content', 'read' );
+
+        if ( in_array( $accessResult['accessWord'], array( 'yes', 'no' ) ) )
+        {
+            return false;
+        }
+
+        $policies =& $accessResult['policies'];
+
+        $limitationHash = array(
+           'Class'        => 'm_contentclass_id',
+           'Section'      => 'm_section_id',
+           'User_Section' => 'm_section_id',
+           'Subtree'      => 'm_path_string',
+           'User_Subtree' => 'm_path_string',
+           'Node'         => 'm_main_node_id',
+           'Owner'        => 'm_owner_id' );
+
+        $filterQueryPolicies = array();
+
+        // policies are concatenated with OR
+        foreach ( $policies as $limitationList )
+        {
+            // policy limitations are concatenated with AND
+            $filterQueryPolicyLimitations = array();
+
+            foreach ( $limitationList as $limitationType => $limitationValues )
+            {
+                // limitation values of one type in a policy are concatenated with OR
+                $filterQueryPolicyLimitationParts = array();
+
+                switch ( $limitationType )
+                {
+                    case 'User_Subtree':
+                    case 'Subtree':
+                        {
+                            foreach ( $limitationValues as $limitationValue )
+                            {
+                                $pathString = trim( $limitationValue, '/' );
+                                $pathArray = explode( '/', $pathString );
+                                // we only take the last node ID in the path identification string
+                                $subtreeNodeID = array_shift( $pathArray );
+                                $filterQueryPolicyLimitationParts[] = 'm_path:' . $subtreeNodeID;
+                            }
+                        } break;
+
+                    case 'Node':
+                        {
+                            foreach ( $limitationValues as $limitationValue )
+                            {
+                                $pathString = trim( $limitationValue, '/' );
+                                $pathArray = explode( '/', $pathString );
+                                // we only take the last node ID in the path identification string
+                                $nodeID = array_shift( $pathArray );
+                                $filterQueryPolicyLimitationParts[] = 'm_main_node_id:' . $nodeID;
+                            }
+                        } break;
+
+
+                    case 'Owner':
+                        {
+                            $filterQueryPolicyLimitationParts[] = 'm_owner_id:' . $currentUser->attribute ( 'contentobject_id' );
+                        } break;
+
+                    case 'Class':
+                    case 'Section':
+                    case 'User_Section':
+                        {
+                            foreach ( $limitationValues as $limitationValue )
+                            {
+                                $filterQueryPolicyLimitationParts[] = $limitationHash[$limitationType] . ':' . $limitationValue;
+                            }
+                        } break;
+
+                    default :
+                        {
+                            eZDebug::writeDebug( $limitationType, 'eZSolr::policyLimitationFilterQuery unknown limitation type: ' . $limitationType );
+                            continue;
+                        }
+                }
+
+                $filterQueryPolicyLimitations[] = '( ' . implode( ' OR ', $filterQueryPolicyLimitationParts ) . ' )';
+            }
+
+            if ( count( $filterQueryPolicyLimitations ) > 0 )
+            {
+                $filterQueryPolicies[] = '( ' . implode( ' AND ', $filterQueryPolicyLimitations ) . ')';
+            }
+        }
+
+        if ( count( $filterQueryPolicies ) > 0 )
+        {
+            $filterQuery = implode( ' OR ', $filterQueryPolicies );
+        }
+        else
+        {
+            return false;
+        }
+        eZDebug::writeDebug( $filterQuery, 'eZSolr::policyLimitationFilterQuery' );
+
+        return $filterQuery;
+    }
+
+
     function optimize()
     {
         $updateURI = $this->SearchServerURI . '/update';
@@ -146,7 +259,7 @@ class eZSolr
         $limit = ( isset( $params['SearchLimit']  ) && $params['SearchLimit'] ) ? $params['SearchLimit'] : 20;
         $subtrees = isset( $params['SearchSubTreeArray'] ) ? $params['SearchSubTreeArray'] : array();
 
-        $filterQuery = '';
+        $filterQuery = array();
 
         if ( count( $subtrees ) > 0 )
         {
@@ -156,7 +269,14 @@ class eZSolr
                 $subtreeQueryParts[] = 'm_path:' . $subtreeNodeID;
             }
 
-            $filterQuery .= implode( ' OR ', $subtreeQueryParts );
+            $filterQuery[] = implode( ' OR ', $subtreeQueryParts );
+        }
+
+        $policyLimitationFilterQuery = $this->policyLimitationFilterQuery();
+
+        if ( $policyLimitationFilterQuery !== false )
+        {
+            $filterQuery[] = $policyLimitationFilterQuery;
         }
 
         $queryParams = array(
@@ -172,6 +292,7 @@ class eZSolr
             'facet.sort' => 'true'
         );
 
+        eZDebug::writeDebug( $queryParams );
         $searchURI = eZSolr::buildHTTPGetQuery( $this->SearchServerURI . '/select', $queryParams );
         eZDebug::writeDebug( $searchURI, 'search URI' );
         $data = file_get_contents( $searchURI );
@@ -253,12 +374,12 @@ class eZSolr
             {
                 foreach ( $value as $valueKey => $valuePart )
                 {
-                    $encodedQueryParams[] = "$name[$valueKey]=" . urlencode( $valuePart );
+                    $encodedQueryParams[] = urlencode( $name ) . '=' . urlencode( $valuePart );
                 }
             }
             else
             {
-                $encodedQueryParams[] = "$name=" . urlencode( $value );
+                $encodedQueryParams[] = urlencode( $name ) . '=' . urlencode( $value );
             }
         }
 
