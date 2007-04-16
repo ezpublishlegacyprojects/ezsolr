@@ -1,0 +1,7 @@
+Enable the extension
+
+
+In settings/override/solr.ini.append.php, configure your Solr server address:
+
+[SolrSettings]
+SearchServerURI=http://example.com/solr

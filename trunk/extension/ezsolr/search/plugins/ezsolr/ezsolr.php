@@ -146,18 +146,21 @@ class eZSolr
         $xml = new eZXML();
         $dom =& $xml->domTree( $data );
 
-        $response =& $dom->root();
-        $result = $response->elementByName( 'result' );
-        $searchCount = $result->attributeValue( 'numFound' );
-
-        $objectRes = array();
-        $docs = $result->elementsByName( 'doc' );
-        foreach ( $docs as $doc )
+        if ( $dom )
         {
-            $mainNodeIDElement = $doc->elementByAttributeValue( 'name', 'm_main_node_id' );
-            if ( $mainNodeIDElement )
+            $response =& $dom->root();
+            $result = $response->elementByName( 'result' );
+            $searchCount = $result->attributeValue( 'numFound' );
+
+            $objectRes = array();
+            $docs = $result->elementsByName( 'doc' );
+            foreach ( $docs as $doc )
             {
-                $objectRes[] = eZContentObjectTreeNode::fetch( $mainNodeIDElement->textContent() );
+                $mainNodeIDElement = $doc->elementByAttributeValue( 'name', 'm_main_node_id' );
+                if ( $mainNodeIDElement )
+                {
+                    $objectRes[] = eZContentObjectTreeNode::fetch( $mainNodeIDElement->textContent() );
+                }
             }
         }
 
