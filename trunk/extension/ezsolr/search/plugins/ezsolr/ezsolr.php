@@ -102,6 +102,12 @@ class eZSolr
         //$this->post( $updateURI, '<optimize/>' );
     }
 
+    function optimize()
+    {
+        $updateURI = $this->SearchServerURI . '/update';
+        $this->post( $updateURI, '<optimize/>' );
+    }
+
     /*!
      \brief Removes an object from the Solr search server
     */
