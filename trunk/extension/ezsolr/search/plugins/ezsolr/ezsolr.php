@@ -93,6 +93,22 @@ class eZSolr
             $doc->appendChild( $field );
         }
 
+        $mainNode =& $contentObject->attribute( 'main_node' );
+        $pathArray = $mainNode->attribute( 'path_array' );
+        eZDebug::writeDebug( $pathArray );
+
+        foreach ( $pathArray as $pathNodeID )
+        {
+            unset( $field );
+            unset( $fieldValue );
+
+            $field = $dom->createElement( 'field' );
+            $field->setAttribute( 'name', 'm_path' );
+            $fieldValue = eZDOMDocument::createTextNode( $pathNodeID );
+            $field->appendChild( $fieldValue );
+            $doc->appendChild( $field );
+        }
+
         $updateURI = $this->SearchServerURI . '/update';
         $this->post( $updateURI, $dom->toString() );
         $this->post( $updateURI, '<commit/>' );
@@ -128,8 +144,20 @@ class eZSolr
 
         $offset = ( isset( $params['SearchOffset'] ) && $params['SearchOffset'] ) ? $params['SearchOffset'] : 0;
         $limit = ( isset( $params['SearchLimit']  ) && $params['SearchLimit'] ) ? $params['SearchLimit'] : 20;
+        $subtrees = isset( $params['SearchSubTreeArray'] ) ? $params['SearchSubTreeArray'] : array();
 
         $filterQuery = '';
+
+        if ( count( $subtrees ) > 0 )
+        {
+            $subtreeQueryParts = array();
+            foreach ( $subtrees as $subtreeNodeID )
+            {
+                $subtreeQueryParts[] = 'm_path:' . $subtreeNodeID;
+            }
+
+            $filterQuery .= implode( ' OR ', $subtreeQueryParts );
+        }
 
         $queryParams = array(
             'start' => $offset,
@@ -145,6 +173,7 @@ class eZSolr
         );
 
         $searchURI = eZSolr::buildHTTPGetQuery( $this->SearchServerURI . '/select', $queryParams );
+        eZDebug::writeDebug( $searchURI, 'search URI' );
         $data = file_get_contents( $searchURI );
         eZDebug::writeDebug( $data );
 
